@@ -109,6 +109,7 @@ class Manager(object):
         self.add_episode_client = None
         self.register_episode_client = None
         self.registered_episodes = dict()
+        self.is_working = True
 
     def initialize(self):
         self.add_episode_client = rospy.ServiceProxy('/robot/ltm/add_episode', AddEpisode)
@@ -116,9 +117,15 @@ class Manager(object):
 
         # Wait for ROS services
         rospy.loginfo("[LTM]: ... waiting LTM services.")
-        self.add_episode_client.wait_for_service()
-        self.register_episode_client.wait_for_service()
+        try:
+            self.add_episode_client.wait_for_service(timeout=3.0)
+            self.register_episode_client.wait_for_service(timeout=3.0)
+        except rospy.ROSException:
+            rospy.logwarn("[LTM]: ... LTM server not found... LTM/SMACH interface will not run.")
+            self.is_working = False
+            return False
         rospy.loginfo("[LTM]: ... LTM server is up and running.")
+        return True
 
     def introspect(self, state, label="root"):
         if isinstance(state, smach.Container):
@@ -132,13 +139,15 @@ class Manager(object):
             print " - leaf: " + label
 
     def setup(self, state):
-        self.initialize()
+        if not self.initialize():
+            return False
 
         # force root to be registered
         if not self.is_registered(state):
             self.register_state(state, ["_unregistered_root"])
 
         self.setup_tree(state, "root")
+        return True
 
     def setup_callbacks(self, state, start_cb, end_cb):
         # assign callbacks to the state instance.
@@ -189,7 +198,6 @@ class Manager(object):
                 self.setup_callbacks(state, cb_leaf_start, cb_leaf_end)
 
     @staticmethod
-
     def register_state(state, tags):
         rospy.loginfo("[LTM]: - registering state (" + str(state.__class__.__name__) + ") with tags: " + str(tags))
         state.ltm = LTMStateData()
@@ -201,6 +209,8 @@ class Manager(object):
         return hasattr(state, 'ltm') and isinstance(state.ltm, LTMStateData) and state.ltm.is_registered()
 
     def update_branch_uids(self, state):
+        if not self.is_working:
+            return
         # retrieve parent id
         child_id = state.ltm.uid
         child_label = state.ltm.label
@@ -213,6 +223,8 @@ class Manager(object):
         data.parent_id = parent_id
 
     def update_branch_uids_rec(self, state, child_id, child_label):
+        if not self.is_working:
+            return
         """
         Updates parent_id of the state and children_ids of the next parent.
         returns the next parent_id
@@ -249,6 +261,8 @@ class Manager(object):
         return self.update_branch_uids_rec(parent, child_id, child_label)
 
     def save_episode(self, episode, label):
+        if not self.is_working:
+            return
         rospy.loginfo("[LTM]: sending episode [" + label + "](" + str(episode.uid) + ") to the LTM server.")
         try:
             req = AddEpisodeRequest()
@@ -260,6 +274,8 @@ class Manager(object):
                           + str(episode.uid) + ") into the LTM server.")
 
     def cb_leaf_start(self, state):
+        if not self.is_working:
+            return
         # TODO: try/except for ROS stuff.
         # get a uid
         try:
@@ -274,6 +290,8 @@ class Manager(object):
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
+            rospy.logwarn("[LTM]: LTM interface has stopped.")
+            self.is_working = False
             return
         rospy.logdebug("[LTM]: - LEAF [" + state.ltm.label + "](" + str(res.uid) + ") - START callback.")
 
@@ -294,6 +312,8 @@ class Manager(object):
         self.update_branch_uids(state)
 
     def cb_leaf_end(self, state):
+        if not self.is_working:
+            return
         # TODO: try/except for ROS stuff.
         uid = state.ltm.uid
         rospy.logdebug("[LTM]: - LEAF [" + state.ltm.label + "](" + str(uid) + ") - END callback.")
@@ -312,6 +332,8 @@ class Manager(object):
         del self.registered_episodes[uid]
 
     def cb_node_start(self, state):
+        if not self.is_working:
+            return
         # get a uid
         try:
             req = RegisterEpisodeRequest()
@@ -325,6 +347,8 @@ class Manager(object):
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
+            rospy.logwarn("[LTM]: LTM interface has stopped.")
+            self.is_working = False
             return
         rospy.logdebug("[LTM]: - NODE [" + state.ltm.label + "](" + str(res.uid) + ") - START callback.")
 
@@ -345,6 +369,8 @@ class Manager(object):
         self.update_branch_uids(state)
 
     def cb_node_end(self, state):
+        if not self.is_working:
+            return
         uid = state.ltm.uid
         rospy.logdebug("[LTM]: - NODE [" + state.ltm.label + "](" + str(uid) + ") - END callback.")
 
