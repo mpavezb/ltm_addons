@@ -15,6 +15,7 @@ find_package(catkin REQUIRED
     geometry_msgs
     sensor_msgs
     message_generation
+    warehouse_ros_mongo
     ltm
     pluginlib
 )
@@ -62,8 +63,8 @@ generate_messages(
 ###################################
 catkin_package(
     INCLUDE_DIRS ${CATKIN_DEVEL_PREFIX}/include include
-    LIBRARIES
-    CATKIN_DEPENDS roscpp std_srvs std_msgs geometry_msgs sensor_msgs message_runtime ltm
+    LIBRARIES ltm_addons__ltm_plugins
+    CATKIN_DEPENDS roscpp std_srvs std_msgs geometry_msgs sensor_msgs message_runtime warehouse_ros_mongo ltm
     DEPENDS
 )
 
@@ -84,6 +85,8 @@ add_library(ltm_addons__ltm_plugins
     src/image_stream_plugin.cpp
 )
 add_dependencies(ltm_addons__ltm_plugins ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(ltm_addons__ltm_plugins ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
 
 #############
 ## Install ##

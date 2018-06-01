@@ -9,9 +9,11 @@ namespace ltm_addons
 
         // ROS Parameter Server
         double buffer_frequency;
+        std::string type;
+        std::string collection_name;
         ltm::ParameterServerWrapper psw("~");
-        psw.getParameter(param_ns + "type", _type, "images");
-        psw.getParameter(param_ns + "collection", _collection_name, "image_streams");
+        psw.getParameter(param_ns + "type", type, "images");
+        psw.getParameter(param_ns + "collection", collection_name, "image_streams");
         psw.getParameter(param_ns + "topic", _image_topic, "/robot/fake/sensors/camera/image_raw");
         psw.getParameter(param_ns + "buffer_frequency", buffer_frequency, 3.0);
         psw.getParameter(param_ns + "buffer_size", _buffer_max_size, 100);
@@ -38,17 +40,8 @@ namespace ltm_addons
         _buffer_size = 0;
 
         // DB connection
-        _conn = ptr;
-        _db_name = db_name;
-        setup_db();
-
-        // ROS API
-        ros::NodeHandle priv("~");
-        _status_service = priv.advertiseService("stream/" + _type + "/status", &ImageStreamPlugin::status_service, this);
-        _drop_db_service = priv.advertiseService("stream/" + _type + "/drop_db", &ImageStreamPlugin::drop_db_service, this);
-        _add_stream_service = priv.advertiseService("stream/" + _type + "/add", &ImageStreamPlugin::add_service, this);
-        _get_stream_service = priv.advertiseService("stream/" + _type + "/get", &ImageStreamPlugin::get_service, this);
-        _delete_stream_service = priv.advertiseService("stream/" + _type + "/delete", &ImageStreamPlugin::delete_service, this);
+        manager.reset(new Manager(ptr, db_name, collection_name, type, _log_prefix));
+        manager->setup();
     }
 
     ImageStreamPlugin::~ImageStreamPlugin() {
@@ -58,37 +51,10 @@ namespace ltm_addons
         }
     }
 
-    void ImageStreamPlugin::setup_db() {
-        try {
-            // host, port, timeout
-            _coll = _conn->openCollectionPtr<ImageStream>(_db_name, _collection_name);
-        }
-        catch (const warehouse_ros::DbConnectException& exception) {
-            // Connection timeout
-            ROS_ERROR_STREAM("Connection timeout to DB '" << _db_name << "' while trying to open collection " << _collection_name);
-        }
-        // Check for empty database
-        if (!_conn->isConnected() || !_coll) {
-            ROS_ERROR_STREAM("Connection to DB failed for collection '" << _collection_name << "'.");
-        }
-    }
-
 
     // =================================================================================================================
     // Private API
     // =================================================================================================================
-
-    void ImageStreamPlugin::subscribe() {
-        ros::NodeHandle priv("~");
-        _image_sub = priv.subscribe(_image_topic, 2, &ImageStreamPlugin::image_callback, this,
-                                    ros::TransportHints().unreliable().reliable());
-        ROS_INFO_STREAM(_log_prefix << "Subscribing to topic: " << _image_sub.getTopic());
-    }
-
-    void ImageStreamPlugin::unsubscribe() {
-        ROS_INFO_STREAM(_log_prefix << "Unsubscribing from topic: " << _image_sub.getTopic());
-        _image_sub.shutdown();
-    }
 
     void ImageStreamPlugin::image_callback(const sensor_msgs::ImageConstPtr& msg) {
         // keep buffer period
@@ -107,35 +73,6 @@ namespace ltm_addons
     // =================================================================================================================
     // Public API
     // =================================================================================================================
-
-    std::string ImageStreamPlugin::get_type() {
-        return _type;
-    }
-
-    std::string ImageStreamPlugin::get_collection_name() {
-        return _collection_name;
-    }
-
-    void ImageStreamPlugin::register_episode(uint32_t uid) {
-        ROS_DEBUG_STREAM(_log_prefix << "LTM Image Stream plugin: registering episode " << uid);
-
-        // subscribe on demand
-        if (registry.empty()) subscribe();
-
-        // register in cache
-        std::vector<uint32_t>::const_iterator it = std::find(registry.begin(), registry.end(), uid);
-        if (it == registry.end()) registry.push_back(uid);
-    }
-
-    void ImageStreamPlugin::unregister_episode(uint32_t uid) {
-        ROS_DEBUG_STREAM(_log_prefix << "LTM Image Stream plugin: unregistering episode " << uid);
-        // unregister from cache
-        std::vector<uint32_t>::iterator it = std::find(registry.begin(), registry.end(), uid);
-        if (it != registry.end()) registry.erase(it);
-
-        // unsubscribe on demand
-        if (registry.empty()) unsubscribe();
-    }
 
     void ImageStreamPlugin::collect(uint32_t uid, ltm::What& msg, ros::Time start, ros::Time end) {
         ROS_DEBUG_STREAM(_log_prefix << "LTM Image Stream plugin: collecting episode " << uid << ".");
@@ -182,13 +119,49 @@ namespace ltm_addons
         // TODO
     }
 
+    void ImageStreamPlugin::subscribe() {
+        ros::NodeHandle priv("~");
+        _image_sub = priv.subscribe(_image_topic, 2, &ImageStreamPlugin::image_callback, this,
+                                    ros::TransportHints().unreliable().reliable());
+        ROS_WARN_STREAM(_log_prefix << "Subscribing to topic: " << _image_sub.getTopic());
+    }
+
+    void ImageStreamPlugin::unsubscribe() {
+        ROS_WARN_STREAM(_log_prefix << "Unsubscribing from topic: " << _image_sub.getTopic());
+        _image_sub.shutdown();
+    }
+
+    void ImageStreamPlugin::setup_db() {
+
+    }
+
+    std::string ImageStreamPlugin::get_type() {
+        return manager->get_type();
+    }
+
+    std::string ImageStreamPlugin::get_collection_name() {
+        return manager->get_collection_name();
+    }
+
+    void ImageStreamPlugin::register_episode(uint32_t uid) {
+        manager->register_episode(uid);
+    }
+
+    void ImageStreamPlugin::unregister_episode(uint32_t uid) {
+        manager->unregister_episode(uid);
+    }
+
+    bool ImageStreamPlugin::is_reserved(int uid) {
+        return manager->is_reserved(uid);
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // CRUD methods
     // -----------------------------------------------------------------------------------------------------------------
 
     MetadataPtr ImageStreamPlugin::make_metadata(const ltm_addons::ImageStream &stream) {
-        MetadataPtr meta = _coll->createMetadata();
+        MetadataPtr meta = manager->create_metadata();
         meta->append("uid", (int) stream.uid);
 
         double start = stream.start.sec + stream.start.nsec * pow10(-9);
@@ -199,122 +172,31 @@ namespace ltm_addons
     }
 
     bool ImageStreamPlugin::insert(const ImageStream &stream) {
-        _coll->insert(stream, make_metadata(stream));
-        // todo: insert into cache
-        ROS_INFO_STREAM(_log_prefix << "Inserting stream (" << stream.uid << ") into collection " << "'" << _collection_name << "'. (" << count() << ") entries.");
-        return true;
+        return manager->insert(stream, make_metadata(stream));
     }
 
-    bool ImageStreamPlugin::get(uint32_t uid, ImageStreamWithMetadataPtr &stream_ptr) {
-        QueryPtr query = _coll->createQuery();
-        query->append("uid", (int)uid);
-        try {
-            stream_ptr = _coll->findOne(query, false);
-        }
-        catch (const warehouse_ros::NoMatchingMessageException& exception) {
-            stream_ptr.reset();
-            return false;
-        }
-        return true;
+    bool ImageStreamPlugin::get(uint32_t uid, Manager::StreamWithMetadataPtr &stream_ptr) {
+        return manager->get(uid, stream_ptr);
     }
 
     bool ImageStreamPlugin::update(uint32_t uid, const ltm_addons::ImageStream &stream) {
-        ROS_WARN("UPDATE: Method not implemented");
-        return false;
+        return manager->update(uid, stream);
     }
 
     bool ImageStreamPlugin::remove(uint32_t uid) {
-
-        // value is already reserved
-        std::vector<uint32_t>::iterator it = std::find(registry.begin(), registry.end(), uid);
-        if (it != registry.end()) registry.erase(it);
-
-        // value is in db cache
-        // remove from cache
-
-        // remove from DB
-        QueryPtr query = _coll->createQuery();
-        query->append("uid", (int)uid);
-        _coll->removeMessages(query);
-        return true;
+        return manager->remove(uid);
     }
 
     int ImageStreamPlugin::count() {
-        return _coll->count();
+        return manager->count();
     }
 
     bool ImageStreamPlugin::has(int uid) {
-        // TODO: doc, no revisa por uids ya registradas
-        QueryPtr query = _coll->createQuery();
-        query->append("uid", uid);
-        try {
-            _coll->findOne(query, true);
-        }
-        catch (const warehouse_ros::NoMatchingMessageException& exception) {
-            return false;
-        }
-        return true;
-    }
-
-    bool ImageStreamPlugin::is_reserved(int uid) {
-
-        // value is in registry
-        std::vector<uint32_t>::iterator it = std::find(registry.begin(), registry.end(), uid);
-        if (it != registry.end()) return true;
-
-        // TODO: value is in db cache
-
-        // value is already in DB
-        return has(uid);
+        return manager->has(uid);
     }
 
     bool ImageStreamPlugin::drop_db() {
-        _conn->dropDatabase(_db_name);
-        registry.clear();
-        // TODO: clear cache
-        setup_db();
-        return true;
-    }
-
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // ROS API
-    // -----------------------------------------------------------------------------------------------------------------
-
-    bool ImageStreamPlugin::status_service(std_srvs::Empty::Request  &req, std_srvs::Empty::Response &res) {
-        ROS_INFO_STREAM(_log_prefix << "Collection '" << _collection_name << "' has " << count() << " entries.");
-        return true;
-    }
-
-    bool ImageStreamPlugin::drop_db_service(std_srvs::Empty::Request  &req, std_srvs::Empty::Response &res) {
-        ROS_WARN_STREAM(_log_prefix << "Deleting all entries from collection '" << _collection_name << "'.");
-        std_srvs::Empty srv;
-        drop_db();
-        status_service(srv.request, srv.response);
-        return true;
-    }
-
-    bool ImageStreamPlugin::add_service(ltm_addons::ImageStreamSrv::Request  &req, ltm_addons::ImageStreamSrv::Response &res) {
-        ROS_WARN_STREAM(_log_prefix << "ADD service is not implemented yet.");
-        return true;
-    }
-
-    bool ImageStreamPlugin::get_service(ltm_addons::ImageStreamSrv::Request  &req, ltm_addons::ImageStreamSrv::Response &res) {
-        ROS_INFO_STREAM(_log_prefix << "Retrieving stream (" << req.uid << ") from collection '" << _collection_name << "'");
-        ImageStreamWithMetadataPtr stream_ptr;
-        if (!get(req.uid, stream_ptr)) {
-            ROS_ERROR_STREAM(_log_prefix << "Stream with uid '" << req.uid << "' not found.");
-            res.succeeded = (uint8_t) false;
-            return true;
-        }
-        res.msg = *stream_ptr;
-        res.succeeded = (uint8_t) true;
-        return true;
-    }
-
-    bool ImageStreamPlugin::delete_service(ltm_addons::ImageStreamSrv::Request  &req, ltm_addons::ImageStreamSrv::Response &res) {
-        ROS_INFO_STREAM(_log_prefix << "Removing (" << req.uid << ") from collection '" << _collection_name << "'");
-        return remove(req.uid);
+        return manager->drop_db();
     }
 
 };
