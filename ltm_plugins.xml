@@ -1,0 +1,8 @@
+<library path="lib/libltm_addons__ltm_plugins">
+
+    <!-- Image Stream plugin -->
+    <class type="ltm_addons::ImageStreamPlugin" base_class_type="ltm::plugin::StreamBase">
+        <description>This is an LTM plugin. It provides the last seen images to the LTM server.</description>
+    </class>
+
+</library>
