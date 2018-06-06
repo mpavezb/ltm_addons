@@ -3,17 +3,17 @@
 
 namespace ltm_addons
 {
-    void ImageStreamPlugin::initialize(const std::string& param_ns, DBConnectionPtr ptr, std::string db_name) {
+    // =================================================================================================================
+    // Public API
+    // =================================================================================================================
+
+    void ImageStreamPlugin::initialize(const std::string &param_ns, DBConnectionPtr db_ptr, std::string db_name) {
         _log_prefix = "[LTM][Image Stream]: ";
         ROS_DEBUG_STREAM(_log_prefix << "plugin initialized with ns: " << param_ns);
 
         // ROS Parameter Server
         double buffer_frequency;
-        std::string type;
-        std::string collection_name;
         ltm::ParameterServerWrapper psw("~");
-        psw.getParameter(param_ns + "type", type, "images");
-        psw.getParameter(param_ns + "collection", collection_name, "image_streams");
         psw.getParameter(param_ns + "topic", _image_topic, "/robot/fake/sensors/camera/image_raw");
         psw.getParameter(param_ns + "buffer_frequency", buffer_frequency, 3.0);
         psw.getParameter(param_ns + "buffer_size", _buffer_max_size, 100);
@@ -40,8 +40,10 @@ namespace ltm_addons
         _buffer_size = 0;
 
         // DB connection
-        manager.reset(new Manager(ptr, db_name, collection_name, type, _log_prefix));
-        manager->setup();
+        this->ltm_setup(param_ns, db_ptr, db_name);
+
+        // init ROS interface
+        this->ltm_init();
     }
 
     ImageStreamPlugin::~ImageStreamPlugin() {
@@ -51,34 +53,11 @@ namespace ltm_addons
         }
     }
 
-
-    // =================================================================================================================
-    // Private API
-    // =================================================================================================================
-
-    void ImageStreamPlugin::image_callback(const sensor_msgs::ImageConstPtr& msg) {
-        // keep buffer period
-        ros::Time now = ros::Time::now();
-        if (now - _last_callback < _buffer_period) return;
-        _last_callback = now;
-
-        // fill buffer
-        _buffer_size = std::min((size_t)_buffer_max_size, _buffer_size + 1);
-        _last_idx = (_last_idx + 1) % _buffer_max_size;
-        _buffer[_last_idx] = msg;
-        ROS_DEBUG_STREAM_THROTTLE(5.0, _log_prefix << "Received image (" << (_last_idx + 1) << "/" << _buffer_max_size << ").");
-    }
-
-
-    // =================================================================================================================
-    // Public API
-    // =================================================================================================================
-
-    void ImageStreamPlugin::collect(uint32_t uid, ltm::What& msg, ros::Time start, ros::Time end) {
-        ROS_DEBUG_STREAM(_log_prefix << "LTM Image Stream plugin: collecting episode " << uid << ".");
+    void ImageStreamPlugin::collect(uint32_t uid, ltm::What &msg, ros::Time start, ros::Time end) {
+        ROS_DEBUG_STREAM(_log_prefix << "Collecting episode " << uid << ".");
 
         // save into Image Stream collection
-        ImageStream stream;
+        StreamType stream;
         stream.uid = uid;
         stream.start = start;
         stream.end = end;
@@ -104,64 +83,63 @@ namespace ltm_addons
             // circular loop
             curr_msg = (curr_msg + 1) % _buffer_max_size;
         }
-        ROS_DEBUG_STREAM(_log_prefix << "Collected (" << cnt << ") images.");
-        insert(stream);
+        ROS_WARN_STREAM(_log_prefix << "Collected (" << cnt << ") images.");
 
         // append to msg
-        msg.streams.push_back(get_type());
+        msg.streams.push_back(ltm_get_type());
 
         // unregister
         // TODO: redundant calls to (un)register methods?
         unregister_episode(uid);
+
+        ltm_insert(stream, make_metadata(stream));
     }
 
     void ImageStreamPlugin::degrade(uint32_t uid) {
         // TODO
     }
 
+    void ImageStreamPlugin::register_episode(uint32_t uid) {
+        bool subscribe = this->ltm_register_episode(uid);
+        if (subscribe) this->subscribe();
+    }
+
+    void ImageStreamPlugin::unregister_episode(uint32_t uid) {
+        bool unsubscribe = this->ltm_unregister_episode(uid);
+        if (unsubscribe) this->unsubscribe();
+    }
+
+    // =================================================================================================================
+    // Private API
+    // =================================================================================================================
+
+    void ImageStreamPlugin::image_callback(const sensor_msgs::ImageConstPtr& msg) {
+        // keep buffer period
+        ros::Time now = ros::Time::now();
+        if (now - _last_callback < _buffer_period) return;
+        _last_callback = now;
+
+        // fill buffer
+        _buffer_size = std::min((size_t)_buffer_max_size, _buffer_size + 1);
+        _last_idx = (_last_idx + 1) % _buffer_max_size;
+        _buffer[_last_idx] = msg;
+        ROS_DEBUG_STREAM_THROTTLE(5.0, _log_prefix << "Received image (" << (_last_idx + 1) << "/" << _buffer_max_size << ").");
+    }
+
     void ImageStreamPlugin::subscribe() {
         ros::NodeHandle priv("~");
         _image_sub = priv.subscribe(_image_topic, 2, &ImageStreamPlugin::image_callback, this,
                                     ros::TransportHints().unreliable().reliable());
-        ROS_WARN_STREAM(_log_prefix << "Subscribing to topic: " << _image_sub.getTopic());
+        ROS_DEBUG_STREAM(_log_prefix << "Subscribing to topic: " << _image_sub.getTopic());
     }
 
     void ImageStreamPlugin::unsubscribe() {
-        ROS_WARN_STREAM(_log_prefix << "Unsubscribing from topic: " << _image_sub.getTopic());
+        ROS_DEBUG_STREAM(_log_prefix << "Unsubscribing from topic: " << _image_sub.getTopic());
         _image_sub.shutdown();
     }
 
-    void ImageStreamPlugin::setup_db() {
-
-    }
-
-    std::string ImageStreamPlugin::get_type() {
-        return manager->get_type();
-    }
-
-    std::string ImageStreamPlugin::get_collection_name() {
-        return manager->get_collection_name();
-    }
-
-    void ImageStreamPlugin::register_episode(uint32_t uid) {
-        manager->register_episode(uid);
-    }
-
-    void ImageStreamPlugin::unregister_episode(uint32_t uid) {
-        manager->unregister_episode(uid);
-    }
-
-    bool ImageStreamPlugin::is_reserved(int uid) {
-        return manager->is_reserved(uid);
-    }
-
-
-    // -----------------------------------------------------------------------------------------------------------------
-    // CRUD methods
-    // -----------------------------------------------------------------------------------------------------------------
-
-    MetadataPtr ImageStreamPlugin::make_metadata(const ltm_addons::ImageStream &stream) {
-        MetadataPtr meta = manager->create_metadata();
+    MetadataPtr ImageStreamPlugin::make_metadata(const StreamType &stream) {
+        MetadataPtr meta = ltm_create_metadata();
         meta->append("uid", (int) stream.uid);
 
         double start = stream.start.sec + stream.start.nsec * pow10(-9);
@@ -169,34 +147,6 @@ namespace ltm_addons
         meta->append("start", start);
         meta->append("end", end);
         return meta;
-    }
-
-    bool ImageStreamPlugin::insert(const ImageStream &stream) {
-        return manager->insert(stream, make_metadata(stream));
-    }
-
-    bool ImageStreamPlugin::get(uint32_t uid, Manager::StreamWithMetadataPtr &stream_ptr) {
-        return manager->get(uid, stream_ptr);
-    }
-
-    bool ImageStreamPlugin::update(uint32_t uid, const ltm_addons::ImageStream &stream) {
-        return manager->update(uid, stream);
-    }
-
-    bool ImageStreamPlugin::remove(uint32_t uid) {
-        return manager->remove(uid);
-    }
-
-    int ImageStreamPlugin::count() {
-        return manager->count();
-    }
-
-    bool ImageStreamPlugin::has(int uid) {
-        return manager->has(uid);
-    }
-
-    bool ImageStreamPlugin::drop_db() {
-        return manager->drop_db();
     }
 
 };

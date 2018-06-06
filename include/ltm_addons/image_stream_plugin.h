@@ -2,6 +2,7 @@
 #define LTM_ADDONS_IMAGE_STREAM_PLUGIN_H_
 
 #include <ros/ros.h>
+#include <ltm/plugin/stream_default.h>
 #include <ltm/plugin/stream_base.h>
 #include <ltm_addons/ImageStream.h>
 #include <ltm_addons/ImageStreamSrv.h>
@@ -9,12 +10,10 @@
 
 namespace ltm_addons
 {
-    class ImageStreamPlugin : public ltm::plugin::StreamBase
+    class ImageStreamPlugin : public ltm::plugin::StreamBase, public ltm::plugin::StreamDefault<ltm_addons::ImageStream, ltm_addons::ImageStreamSrv>
     {
     private:
-        typedef ltm::db::StreamCollectionManager<ltm_addons::ImageStream, ltm_addons::ImageStreamSrv> Manager;
-        typedef boost::shared_ptr<Manager> ManagerPtr;
-        ManagerPtr manager;
+        typedef ltm_addons::ImageStream StreamType;
 
         // plugin
         std::vector<sensor_msgs::ImageConstPtr> _buffer;
@@ -31,42 +30,33 @@ namespace ltm_addons
         std::string _image_topic;
         ros::Subscriber _image_sub;
 
-        void image_callback(const sensor_msgs::ImageConstPtr& msg);
-
-        // DB API
-        MetadataPtr make_metadata(const ImageStream &stream);
-        bool insert(const ImageStream &stream);
-        bool get(uint32_t uid, Manager::StreamWithMetadataPtr &stream_ptr);
-        bool update(uint32_t uid, const ImageStream &stream);
-
-    protected:
-        void subscribe();
-        void unsubscribe();
-
     public:
-
         ImageStreamPlugin(){}
         ~ImageStreamPlugin();
 
-        void initialize(const std::string& param_ns, DBConnectionPtr ptr, std::string db_name);
+    private:
+        // =================================================================================================================
+        // Private API
+        // =================================================================================================================
 
-        void collect(uint32_t uid, ltm::What& msg, ros::Time start, ros::Time end);
+        // msg metadata
+        MetadataPtr make_metadata(const StreamType &stream);
 
-        void degrade(uint32_t uid);
+        // ROS topic callback
+        void subscribe();
+        void unsubscribe();
+        void image_callback(const sensor_msgs::ImageConstPtr& msg);
 
-        void setup_db();
-        std::string get_type();
-        std::string get_collection_name();
+    public:
+        // =================================================================================================================
+        // Public API
+        // =================================================================================================================
+
+        void initialize(const std::string &param_ns, DBConnectionPtr ptr, std::string db_name);
+        void collect(uint32_t uid, ltm::What &msg, ros::Time _start, ros::Time _end);
         void register_episode(uint32_t uid);
         void unregister_episode(uint32_t uid);
-        bool is_reserved(int uid);
-
-        // DB API
-        bool remove(uint32_t uid);
-        int count();
-        bool has(int uid);
-        bool drop_db();
-
+        void degrade(uint32_t uid);
     };
 
 };
