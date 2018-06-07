@@ -83,7 +83,7 @@ namespace ltm_addons
             // circular loop
             curr_msg = (curr_msg + 1) % _buffer_max_size;
         }
-        ROS_WARN_STREAM(_log_prefix << "Collected (" << cnt << ") images.");
+        ROS_DEBUG_STREAM(_log_prefix << "Collected (" << cnt << ") images.");
 
         // append to msg
         msg.streams.push_back(ltm_get_type());

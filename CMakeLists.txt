@@ -9,13 +9,11 @@ project(ltm_addons)
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/")
 find_package(catkin REQUIRED
     roscpp
-    rostest
     std_srvs
     std_msgs
     geometry_msgs
     sensor_msgs
     message_generation
-    warehouse_ros_mongo
     ltm
     pluginlib
 )
@@ -64,7 +62,7 @@ generate_messages(
 catkin_package(
     INCLUDE_DIRS ${CATKIN_DEVEL_PREFIX}/include include
     LIBRARIES ltm_addons__ltm_plugins
-    CATKIN_DEPENDS roscpp std_srvs std_msgs geometry_msgs sensor_msgs message_runtime warehouse_ros_mongo ltm
+    CATKIN_DEPENDS roscpp std_srvs std_msgs geometry_msgs sensor_msgs message_runtime ltm
     DEPENDS
 )
 

@@ -31,7 +31,6 @@
     <depend>smach</depend>
     <depend>smach_ros</depend>
     <depend>pluginlib</depend>
-    <depend>warehouse_ros_mongo</depend>
     <depend>ltm</depend>
 
     <!-- build dependencies -->
