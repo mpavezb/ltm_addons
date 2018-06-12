@@ -109,6 +109,21 @@ namespace ltm_addons
         if (unsubscribe) this->unsubscribe();
     }
 
+    void ImageStreamPlugin::drop_db() {
+        _last_callback = ros::Time(0.0);
+
+        // setup (init buffer with zero timed images)
+        _last_idx = (size_t)(_buffer_max_size - 1);
+        _buffer.reserve((size_t)_buffer_max_size);
+        _buffer.resize((size_t)_buffer_max_size);
+        _buffer_size = 0;
+        this->ltm_drop_db();
+    }
+
+    void ImageStreamPlugin::append_status(std::stringstream &status) {
+        status << this->ltm_get_status();
+    }
+
     // =================================================================================================================
     // Private API
     // =================================================================================================================
