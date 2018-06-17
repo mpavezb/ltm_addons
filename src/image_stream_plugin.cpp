@@ -86,10 +86,12 @@ namespace ltm_addons
         ROS_DEBUG_STREAM(_log_prefix << "Collected (" << cnt << ") images.");
 
         // append to msg
-        msg.streams.push_back(ltm_get_type());
+        ltm::StreamRegister reg;
+        reg.uid = uid;
+        reg.type = ltm_get_type();
+        msg.streams.push_back(reg);
 
         // unregister
-        // TODO: redundant calls to (un)register methods?
         unregister_episode(uid);
 
         ltm_insert(stream, make_metadata(stream));

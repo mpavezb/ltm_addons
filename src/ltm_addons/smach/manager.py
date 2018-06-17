@@ -61,7 +61,6 @@ class LTMStateData(object):
 
 
 class EpisodeData(object):
-    # TODO: use inheritance to represent Nodes and Leafs
 
     def __init__(self):
         self.uid = None
@@ -100,8 +99,7 @@ def cb_leaf_end(self, manager):
 
 class Manager(object):
     __metaclass__ = Singleton
-    # TODO: try/except for everything related to the manager, but raise machine exceptions. We cannot let the
-    # machine die for a LTM related error.
+    # TODO: try/except for everything related to the manager, but raise machine exceptions.
 
     def __init__(self):
         # ROS clients
@@ -276,7 +274,6 @@ class Manager(object):
     def cb_leaf_start(self, state):
         if not self.is_working:
             return
-        # TODO: try/except for ROS stuff.
         # get a uid
         try:
             req = RegisterEpisodeRequest()
@@ -287,6 +284,7 @@ class Manager(object):
             req.replace = False
             req.generate_uid = True
             req.uid = 0
+            req.is_leaf = True
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
@@ -314,7 +312,6 @@ class Manager(object):
     def cb_leaf_end(self, state):
         if not self.is_working:
             return
-        # TODO: try/except for ROS stuff.
         uid = state.ltm.uid
         rospy.logdebug("[LTM]: - LEAF [" + state.ltm.label + "](" + str(uid) + ") - END callback.")
 
@@ -344,6 +341,7 @@ class Manager(object):
             req.replace = False
             req.generate_uid = True
             req.uid = 0
+            req.is_leaf = False
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
