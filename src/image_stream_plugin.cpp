@@ -1,5 +1,5 @@
 #include <ltm_addons/image_stream_plugin.h>
-#include <ltm/parameter_server_wrapper.h>
+#include <ltm/util/parameter_server_wrapper.h>
 
 namespace ltm_addons
 {
@@ -13,7 +13,7 @@ namespace ltm_addons
 
         // ROS Parameter Server
         double buffer_frequency;
-        ltm::ParameterServerWrapper psw("~");
+        ltm::util::ParameterServerWrapper psw("~");
         psw.getParameter(param_ns + "topic", _image_topic, "/robot/fake/sensors/camera/image_raw");
         psw.getParameter(param_ns + "buffer_frequency", buffer_frequency, 3.0);
         psw.getParameter(param_ns + "buffer_size", _buffer_max_size, 100);
