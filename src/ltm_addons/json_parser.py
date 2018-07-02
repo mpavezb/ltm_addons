@@ -56,12 +56,12 @@ class JsonParser(object):
 
     def json_to_episode(self, data):
         episode = Episode()
-        episode.uid = data['uid']
-        episode.type = data['type']
-        episode.tags = data['tags']
+        self.get_data(episode, "uid", data)
+        self.get_data(episode, "type", data)
+        self.get_data(episode, "tags", data)
         self.get_data(episode, 'children_tags', data)
-        episode.parent_id = data['parent_id']
-        episode.children_ids = data['children_ids']
+        self.get_data(episode, "parent_id", data)
+        self.get_data(episode, "children_ids", data)
         episode.info = self.json_to_field_info(data['info'])
         episode.what = self.json_to_field_what(data['what'])
         episode.where = self.json_to_field_where(data['where'])
@@ -110,8 +110,6 @@ class JsonParser(object):
         what = What()
         if self.use_auto_data(data):
             return what
-        self.get_data(what, 'features', data)
-        self.get_data(what, 'feature_values', data)
         return what
 
     def json_to_field_where(self, data):
@@ -123,9 +121,9 @@ class JsonParser(object):
         self.get_data(where, 'position', data, self.json_to_ros_position)
         self.get_data(where, 'location', data)
         self.get_data(where, 'area', data)
+        # self.get_data(where, 'children_hull', data)
         self.get_data(where, 'children_locations', data)
         self.get_data(where, 'children_areas', data)
-        self.get_data(where, 'children_hull', data)
         return where
 
     def json_to_field_when(self, data):

@@ -10,24 +10,26 @@ from ltm_addons.json_parser import JsonParser
 from ltm.srv import *
 
 
-class LoaderNode(object):
+class JsonLoader(object):
 
-    def __init__(self):
+    def __init__(self, source=None, ns=""):
         self._is_file = None
-        self.loader = JsonParser()
+        self.parser = JsonParser()
         self.saved_episodes = []
         self.failed_episodes = []
         self.root_episodes = []
 
         # ROS parameters
-        self.source = rospy.get_param("~source", None)
+        self.source = source
+        if not self.source:
+            self.source = rospy.get_param("~source", None)
         self.setup_path()
 
         # ROS clients
         rospy.loginfo("Waiting for LTM server to be up.")
-        self.register_episode_client = rospy.ServiceProxy('ltm/register_episode', RegisterEpisode)
-        self.add_episode_client = rospy.ServiceProxy('ltm/add_episode', AddEpisode)
-        self.update_tree_client = rospy.ServiceProxy('ltm/update_tree', UpdateTree)
+        self.register_episode_client = rospy.ServiceProxy(ns + 'ltm/register_episode', RegisterEpisode)
+        self.add_episode_client = rospy.ServiceProxy(ns + 'ltm/add_episode', AddEpisode)
+        self.update_tree_client = rospy.ServiceProxy(ns + 'ltm/update_tree', UpdateTree)
 
         # Wait for ROS services
         self.add_episode_client.wait_for_service()
@@ -59,16 +61,18 @@ class LoaderNode(object):
             reg_req.replace = True
             reg_req.generate_uid = False
             reg_req.uid = episode.uid
+            rospy.loginfo("Registering episode: " + str(episode.uid))
             self.register_episode_client(reg_req)
 
             # add episode
             req = AddEpisodeRequest()
             req.episode = episode
             req.replace = True
+            rospy.loginfo("Adding episode: " + str(episode.uid))
             res = self.add_episode_client(req)
             if res.succeeded:
                 self.saved_episodes.append(episode.uid)
-                if episode.uid == episode.parent_id:
+                if episode.parent_id == 0:
                     self.root_episodes.append(episode.uid)
                 return True
         except rospy.ServiceException, e:
@@ -76,7 +80,7 @@ class LoaderNode(object):
         self.failed_episodes.append(episode.uid)
         return False
 
-    def load_json(self):
+    def load(self):
         if self._is_file:
             self.load_file(self.source)
             if len(self.saved_episodes) == 1:
@@ -85,8 +89,8 @@ class LoaderNode(object):
             self.load_folder()
 
     def load_file(self, filename):
-        data = self.loader.load_json(filename)
-        episode = self.loader.json_to_episode(data)
+        data = self.parser.load_json(filename)
+        episode = self.parser.json_to_episode(data)
         return self.save(episode)
 
     def update_tree(self, uid):
@@ -123,7 +127,7 @@ class LoaderNode(object):
 def main():
     try:
         rospy.init_node("ltm_json_loader")
-        node = LoaderNode()
-        node.load_json()
+        node = JsonLoader()
+        node.load()
     except rospy.ROSInterruptException:
         pass
