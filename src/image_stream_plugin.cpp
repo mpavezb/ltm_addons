@@ -112,6 +112,11 @@ namespace ltm_addons
     }
 
     void ImageStreamPlugin::drop_db() {
+        this->reset(this->ltm_get_db_name());
+        this->ltm_drop_db();
+    }
+
+    void ImageStreamPlugin::reset(const std::string &db_name) {
         _last_callback = ros::Time(0.0);
 
         // setup (init buffer with zero timed images)
@@ -119,7 +124,8 @@ namespace ltm_addons
         _buffer.reserve((size_t)_buffer_max_size);
         _buffer.resize((size_t)_buffer_max_size);
         _buffer_size = 0;
-        this->ltm_drop_db();
+
+        this->ltm_resetup_db(db_name);
     }
 
     void ImageStreamPlugin::append_status(std::stringstream &status) {

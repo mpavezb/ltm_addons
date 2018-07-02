@@ -52,6 +52,7 @@ namespace ltm_addons
         void unregister_episode(uint32_t uid);
         void degrade(uint32_t uid);
         void drop_db();
+        void reset(const std::string &db_name);
         void append_status(std::stringstream &status);
     };
 
