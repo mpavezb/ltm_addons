@@ -60,8 +60,8 @@ namespace ltm_addons
         StreamType stream;
         stream.meta.uid = uid;
         stream.meta.episode = uid;
-        stream.start = start;
-        stream.end = end;
+        stream.meta.start = start;
+        stream.meta.end = end;
 
         // TODO: mutex (it is not required, because we are using a single-threaded Spinner for callbacks)
         size_t oldest_msg = (_last_idx + 1) % _buffer_max_size;
@@ -138,10 +138,12 @@ namespace ltm_addons
         meta->append("uid", (int) stream.meta.uid);
         meta->append("uid", (int) stream.meta.episode);
 
-        double start = stream.start.sec + stream.start.nsec * pow10(-9);
-        double end = stream.end.sec + stream.end.nsec * pow10(-9);
+        double start = stream.meta.start.sec + stream.meta.start.nsec * pow10(-9);
+        double end = stream.meta.end.sec + stream.meta.end.nsec * pow10(-9);
         meta->append("start", start);
         meta->append("end", end);
+
+        meta->append("images", (int) stream.images.size());
         return meta;
     }
 
