@@ -58,7 +58,8 @@ namespace ltm_addons
 
         // save into Image Stream collection
         StreamType stream;
-        stream.uid = uid;
+        stream.meta.uid = uid;
+        stream.meta.episode = uid;
         stream.start = start;
         stream.end = end;
 
@@ -132,6 +133,18 @@ namespace ltm_addons
         status << this->ltm_get_status();
     }
 
+    MetadataPtr ImageStreamPlugin::make_metadata(const StreamType &stream) {
+        MetadataPtr meta = ltm_create_metadata();
+        meta->append("uid", (int) stream.meta.uid);
+        meta->append("uid", (int) stream.meta.episode);
+
+        double start = stream.start.sec + stream.start.nsec * pow10(-9);
+        double end = stream.end.sec + stream.end.nsec * pow10(-9);
+        meta->append("start", start);
+        meta->append("end", end);
+        return meta;
+    }
+
     // =================================================================================================================
     // Private API
     // =================================================================================================================
@@ -159,17 +172,6 @@ namespace ltm_addons
     void ImageStreamPlugin::unsubscribe() {
         ROS_DEBUG_STREAM(_log_prefix << "Unsubscribing from topic: " << _image_sub.getTopic());
         _image_sub.shutdown();
-    }
-
-    MetadataPtr ImageStreamPlugin::make_metadata(const StreamType &stream) {
-        MetadataPtr meta = ltm_create_metadata();
-        meta->append("uid", (int) stream.uid);
-
-        double start = stream.start.sec + stream.start.nsec * pow10(-9);
-        double end = stream.end.sec + stream.end.nsec * pow10(-9);
-        meta->append("start", start);
-        meta->append("end", end);
-        return meta;
     }
 
 };

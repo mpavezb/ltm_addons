@@ -37,9 +37,6 @@ namespace ltm_addons
         ~ImageStreamPlugin();
 
     private:
-        // msg metadata
-        MetadataPtr make_metadata(const StreamType &stream);
-
         // ROS topic callback
         void subscribe();
         void unsubscribe();
@@ -54,6 +51,7 @@ namespace ltm_addons
         void drop_db();
         void reset(const std::string &db_name);
         void append_status(std::stringstream &status);
+        MetadataPtr make_metadata(const StreamType &stream);
     };
 
 };
