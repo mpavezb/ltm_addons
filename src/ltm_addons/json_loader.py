@@ -27,9 +27,9 @@ class JsonLoader(object):
 
         # ROS clients
         rospy.loginfo("Waiting for LTM server to be up.")
-        self.register_episode_client = rospy.ServiceProxy(ns + 'ltm/register_episode', RegisterEpisode)
-        self.add_episode_client = rospy.ServiceProxy(ns + 'ltm/add_episode', AddEpisode)
-        self.update_tree_client = rospy.ServiceProxy(ns + 'ltm/update_tree', UpdateTree)
+        self.register_episode_client = rospy.ServiceProxy(ns + 'ltm/episode/register', RegisterEpisode)
+        self.add_episode_client = rospy.ServiceProxy(ns + 'ltm/episode/add', AddEpisode)
+        self.update_tree_client = rospy.ServiceProxy(ns + 'ltm/episode/update_tree', UpdateTree)
 
         # Wait for ROS services
         self.add_episode_client.wait_for_service()
