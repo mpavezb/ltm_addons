@@ -143,14 +143,6 @@ namespace ltm_addons
 
     MetadataPtr ImageStreamPlugin::make_metadata(const StreamType &stream) {
         MetadataPtr meta = ltm_create_metadata();
-        meta->append("uid", (int) stream.meta.uid);
-        meta->append("uid", (int) stream.meta.episode);
-
-        double start = stream.meta.start.sec + stream.meta.start.nsec * pow10(-9);
-        double end = stream.meta.end.sec + stream.meta.end.nsec * pow10(-9);
-        meta->append("start", start);
-        meta->append("end", end);
-
         meta->append("images", (int) stream.images.size());
         return meta;
     }
