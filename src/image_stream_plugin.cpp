@@ -53,6 +53,10 @@ namespace ltm_addons
         }
     }
 
+    std::string ImageStreamPlugin::get_type() {
+        return this->ltm_get_type();
+    }
+
     void ImageStreamPlugin::collect(uint32_t uid, ltm::What &msg, ros::Time start, ros::Time end) {
         ROS_DEBUG_STREAM(_log_prefix << "Collecting episode " << uid << ".");
 
@@ -110,6 +114,10 @@ namespace ltm_addons
     void ImageStreamPlugin::unregister_episode(uint32_t uid) {
         bool unsubscribe = this->ltm_unregister_episode(uid);
         if (unsubscribe) this->unsubscribe();
+    }
+
+    void ImageStreamPlugin::query(const std::string &json, ltm::QueryServer::Response &res) {
+        this->ltm_query(json, res);
     }
 
     void ImageStreamPlugin::drop_db() {

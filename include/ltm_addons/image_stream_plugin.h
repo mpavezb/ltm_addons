@@ -7,6 +7,7 @@
 #include <ltm_addons/ImageStream.h>
 #include <ltm_addons/ImageStreamSrv.h>
 #include <sensor_msgs/Image.h>
+#include <ltm/QueryServer.h>
 
 namespace ltm_addons
 {
@@ -43,10 +44,12 @@ namespace ltm_addons
         void image_callback(const sensor_msgs::ImageConstPtr& msg);
 
     public:
+        std::string get_type();
         void initialize(const std::string &param_ns, DBConnectionPtr ptr, std::string db_name);
         void collect(uint32_t uid, ltm::What &msg, ros::Time _start, ros::Time _end);
         void register_episode(uint32_t uid);
         void unregister_episode(uint32_t uid);
+        void query(const std::string &json, ltm::QueryServer::Response &res);
         void degrade(uint32_t uid);
         void drop_db();
         void reset(const std::string &db_name);
