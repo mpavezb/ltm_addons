@@ -16,7 +16,7 @@ namespace ltm_addons
             public ltm::plugin::StreamDefault<ltm_addons::ImageStream, ltm_addons::ImageStreamSrv>
     {
     private:
-        typedef ltm_addons::ImageStream StreamType;
+        typedef ltm_addons::ImageStream StreamMsg;
 
         // plugin
         std::vector<sensor_msgs::ImageConstPtr> _buffer;
@@ -54,7 +54,7 @@ namespace ltm_addons
         void drop_db();
         void reset(const std::string &db_name);
         void append_status(std::stringstream &status);
-        MetadataPtr make_metadata(const StreamType &stream);
+        MetadataPtr make_metadata(const StreamMsg &stream);
     };
 
 };

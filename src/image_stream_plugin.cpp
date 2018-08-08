@@ -61,7 +61,7 @@ namespace ltm_addons
         ROS_DEBUG_STREAM(_log_prefix << "Collecting episode " << uid << ".");
 
         // save into Image Stream collection
-        StreamType stream;
+        StreamMsg stream;
         stream.meta.uid = uid;
         stream.meta.episode = uid;
         stream.meta.start = start;
@@ -141,7 +141,7 @@ namespace ltm_addons
         status << this->ltm_get_status();
     }
 
-    MetadataPtr ImageStreamPlugin::make_metadata(const StreamType &stream) {
+    MetadataPtr ImageStreamPlugin::make_metadata(const StreamMsg &stream) {
         MetadataPtr meta = ltm_create_metadata();
         meta->append("images", (int) stream.images.size());
         return meta;
