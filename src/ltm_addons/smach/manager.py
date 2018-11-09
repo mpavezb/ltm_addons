@@ -110,8 +110,12 @@ class Manager(object):
         self.is_working = True
 
     def initialize(self):
-        self.add_episode_client = rospy.ServiceProxy('/robot/ltm/episode/add', AddEpisode)
-        self.register_episode_client = rospy.ServiceProxy('/robot/ltm/episode/register', RegisterEpisode)
+        # --------------------------------------------------------------------
+        # TODO: REMOVE THIS NS DEPENDENCY!! IT IS THE ONLY POINT DEPENDENT ON BENDER
+        ns = '/bender/ltm'
+        self.add_episode_client = rospy.ServiceProxy(ns + '/episode/add', AddEpisode)
+        self.register_episode_client = rospy.ServiceProxy(ns + '/episode/register', RegisterEpisode)
+        # --------------------------------------------------------------------
 
         # Wait for ROS services
         rospy.loginfo("[LTM]: ... waiting LTM services.")
