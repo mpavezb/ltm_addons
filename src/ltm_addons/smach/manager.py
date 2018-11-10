@@ -288,7 +288,6 @@ class Manager(object):
             req.replace = False
             req.generate_uid = True
             req.uid = 0
-            req.is_leaf = True
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
@@ -345,7 +344,6 @@ class Manager(object):
             req.replace = False
             req.generate_uid = True
             req.uid = 0
-            req.is_leaf = False
             res = self.register_episode_client(req)
         except rospy.ServiceException:
             rospy.logwarn("[LTM]: There aren't any available uids. DB is full. This state will not be recorded.")
